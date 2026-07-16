@@ -1,74 +1,60 @@
 # Tech Challenge - Fase 4
 
-**Monitoramento Multimodal de Pacientes com IA e Azure**
+**Avaliacao de Videos Clinicos com YOLOv8**
 
-Projeto da Fase 4 do Tech Challenge - Pós-Graduação.
+Este projeto foi migrado para um escopo unico: **avaliar videos**.
 
 ## Objetivo
 
-Sistema de monitoramento contínuo de pacientes por meio de dados multimodais
-(áudio, vídeo e texto) para identificar sinais precoces de risco, integrado com
-serviços gerenciados em nuvem (Azure Cognitive Services).
+Receber videos clinicos ou videos de demonstracao de fisioterapia e produzir:
 
-## Módulos
+- leitura e amostragem do video;
+- deteccao de objetos por frame com `YOLOv8`;
+- identificacao de objetos inesperados;
+- relatorio final por video.
 
-### 1. Análise de Vídeo (`src/video_analysis/`)
-- Processamento de vídeos clínicos (cirurgias, fisioterapia)
-- Detecção postural com OpenPose
-- Detecção de objetos e áreas críticas com YOLOv8
-- Geração de relatórios automáticos de desvios
+## O que o projeto faz hoje
 
-### 2. Análise de Áudio (`src/audio_analysis/`)
-- Processamento de áudios de consultas médicas
-- Detecção de alterações vocais (fadiga, disartria)
-- Transcrição com Azure Speech to Text
-- Análise de sentimentos e termos críticos com Azure Text Analytics
+- avalia um video individual;
+- avalia uma pasta com varios videos;
+- gera relatorios em `data/outputs/reports/`;
+- resume objetos detectados, eventos inesperados e taxa de anomalia.
 
-### 3. Detecção de Anomalias (`src/anomaly_detection/`)
-- Análise de séries temporais de sinais vitais
-- Detecção de alterações em prescrições
-- Padrões de movimentação do paciente
-- Alertas automáticos para equipe médica
+## O que saiu do projeto
 
-### 4. Integração Azure (`src/azure_integration/`)
-- Azure Speech to Text
-- Azure Text Analytics
-- Azure Cognitive Services
+- pipeline multimodal;
+- analise de audio;
+- Azure;
+- sinais vitais;
+- pose estimation;
+- treinamento e avaliacao de datasets.
 
-## Estrutura do Projeto
+## Como executar
 
-```
-tech-challenge-fase4/
-├── data/
-│   ├── datasets/          # Datasets (áudio, vídeo, sinais vitais)
-│   ├── models/            # Modelos treinados
-│   └── outputs/           # Resultados e relatórios gerados
-├── src/
-│   ├── video_analysis/    # Módulo de análise de vídeo
-│   ├── audio_analysis/    # Módulo de análise de áudio
-│   ├── anomaly_detection/ # Módulo de detecção de anomalias
-│   ├── azure_integration/ # Integração com Azure
-│   └── utils/             # Utilitários compartilhados
-├── notebooks/             # Jupyter notebooks exploratórios
-├── docs/                  # Documentação
-├── reports/               # Relatórios técnicos
-└── requirements.txt       # Dependências
+### Avaliar um video
+
+```bash
+python3 main.py --input data/datasets/video/raw/kimore/fisioterapia_01.mp4
 ```
 
-## Tecnologias
+### Avaliar uma pasta de videos
 
-- Python 3.10+
-- Ultralytics YOLOv8
-- OpenPose (análise postural)
-- Azure Cognitive Services (Speech to Text, Text Analytics)
-- Scikit-learn / PyOD (detecção de anomalias)
-- OpenCV, Librosa (processamento audiovisual)
+```bash
+python3 main.py --dir data/datasets/video/raw/kimore
+```
 
-## Datasets Utilizados
+## Estrutura recomendada
 
-### Análise de Vídeo
-- [Sitting Posture Classification](https://universe.roboflow.com/leonardo-sabino/sitting-posture-classification-ccvao-31o25) - 2.347 imagens para classificação postural
+```text
+data/datasets/video/raw/
+└── kimore/
+    ├── fisioterapia_01.mp4
+    └── fisioterapia_02.mp4
+```
 
-### Fontes Sugeridas
-- [PhysioNet](https://physionet.org/) - Sinais vitais e dados clínicos
-- [Google AudioSet](https://research.google.com/audioset/) - Dataset de áudio
+## Saida
+
+Para cada video, o projeto gera:
+
+- um `.json` com o resumo da avaliacao;
+- um `.txt` legivel para apresentacao.

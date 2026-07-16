@@ -1,3 +1,3 @@
-from .analyzer import analyze
+from .evaluator import VideoEvaluator
 
-__all__ = ["analyze"]
+__all__ = ["VideoEvaluator"]

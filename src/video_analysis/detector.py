@@ -1,17 +1,16 @@
 """
 Detector de objetos e areas criticas com YOLOv8.
-
-Utilizado para:
-- Deteccao de instrumentos cirurgicos
-- Identificacao de areas criticas em videos clinicos
-- Deteccao de quedas e anomalias de movimento
 """
 
 import cv2
 import numpy as np
 from pathlib import Path
-from ultralytics import YOLO
-from typing import List, Tuple, Optional, Dict
+from typing import List, Optional, Dict
+
+try:
+    from ultralytics import YOLO
+except ImportError:  # pragma: no cover - depende do ambiente
+    YOLO = None
 
 
 class ObjectDetector:
@@ -22,6 +21,10 @@ class ObjectDetector:
         Args:
             model_path: Caminho para modelo customizado. Se None, usa YOLOv8n.
         """
+        if YOLO is None:
+            raise ImportError(
+                "ultralytics nao instalado. Instale com: pip install ultralytics"
+            )
         if model_path and Path(model_path).exists():
             self.model = YOLO(model_path)
         else:
@@ -123,7 +126,9 @@ class ObjectDetector:
     def detect_anomalous_objects(self, video_path: str,
                                  expected_classes: List[str],
                                  unexpected_classes: List[str],
-                                 conf: float = 0.25) -> Dict:
+                                 conf: float = 0.25,
+                                 sample_rate: int = 5,
+                                 min_confidence: float = 0.45) -> Dict:
         """
         Detecta objetos anomalos (inesperados) em video clinico.
 
@@ -136,13 +141,17 @@ class ObjectDetector:
         Returns:
             Relatorio de anomalias por frame
         """
-        results = self.detect_video(video_path, sample_rate=5, conf=conf)
+        results = self.detect_video(video_path, sample_rate=sample_rate, conf=conf)
         anomalies = []
+        frames_with_anomalies = set()
 
         for frame_idx, detections in results["frame_detections"].items():
             frame_anomalies = []
             for det in detections:
-                if det["class_name"] in unexpected_classes:
+                if (
+                    det["class_name"] in unexpected_classes
+                    and det["confidence"] >= min_confidence
+                ):
                     frame_anomalies.append({
                         "frame": frame_idx,
                         "object": det["class_name"],
@@ -151,6 +160,7 @@ class ObjectDetector:
                         "severity": "high" if det["confidence"] > 0.7 else "medium",
                     })
             if frame_anomalies:
+                frames_with_anomalies.add(frame_idx)
                 anomalies.extend(frame_anomalies)
 
         return {
@@ -158,12 +168,9 @@ class ObjectDetector:
             "anomalies": anomalies,
             "total_anomalies": len(anomalies),
             "frames_analyzed": results["statistics"]["frames_analyzed"],
-            "anomaly_rate": len(anomalies) / max(results["statistics"]["frames_analyzed"], 1),
+            "frames_with_anomalies": len(frames_with_anomalies),
+            "anomaly_rate": (
+                len(frames_with_anomalies)
+                / max(results["statistics"]["frames_analyzed"], 1)
+            ),
         }
-
-
-def download_yolo_model(model_size: str = "n") -> str:
-    """Baixa modelo YOLOv8 se nao existir."""
-    model_name = f"yolov8{model_size}.pt"
-    model = YOLO(model_name)  # auto-download
-    return model_name

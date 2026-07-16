@@ -1,4 +1,4 @@
-"""Utilitários compartilhados."""
+"""Utilitarios compartilhados."""
 
 import os
 import logging
@@ -43,3 +43,11 @@ def generate_report_filename(prefix: str = "report") -> str:
     """Gera nome de arquivo com timestamp."""
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     return f"{prefix}_{ts}"
+
+
+def get_env_bool(name: str, default: bool = False) -> bool:
+    """Le flag booleana de ambiente com fallback seguro."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on", "sim"}
