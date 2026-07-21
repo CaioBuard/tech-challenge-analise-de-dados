@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Upload ZIP{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h1>Upload ZIP - Deteccao de Anomalias Clinicas</h1>
+  <p>Envie um ZIP contendo arquivos <code>.xls</code>, <code>.xlsx</code>, audio ou video.</p>
+
+  <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
+    <p>
+      <input type="file" name="zip_file" accept=".zip" required>
+    </p>
+    <button class="btn" type="submit">Processar ZIP</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Formato esperado do Excel</h2>
+  <p>Use abas chamadas <code>vitals</code>, <code>prescriptions</code> e <code>transfers</code>.</p>
+  <pre>vitals: charttime, heart_rate, spo2, systolic_bp, diastolic_bp, mean_bp
+prescriptions: starttime, stoptime, drug, dose_val_rx, dose_unit_rx, route
+transfers: eventtype, careunit, intime, outtime</pre>
+</section>
+{% endblock %}

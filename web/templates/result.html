@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Resultado{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h1>Resultado do processamento</h1>
+</section>
+
+{% for item in result["results"] %}
+  {% if item["type"] == "xls" %}
+    <section class="panel">
+      <h2>Planilha: {{ item["filename"] }}</h2>
+
+      <h3>Alertas</h3>
+      {% if item["alerts"] %}
+        {% for alert in item["alerts"] %}
+          <div class="alert {{ alert['severity'] }}">
+            <strong>{{ alert["severity"]|upper }}</strong>
+            {{ alert["category"] }} - {{ alert["title"] }}<br>
+            {{ alert["message"] }}<br>
+            <code>score={{ alert["score"] }}</code>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p>Nenhum alerta gerado.</p>
+      {% endif %}
+
+      <h3>Scores dos modelos</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Categoria</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for category, score in item["scores"].items() %}
+            <tr>
+              <td>{{ category }}</td>
+              <td>{{ score }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h3>Graficos gerados</h3>
+      {% for image in item["images"] %}
+        <h4>{{ image["name"] }}</h4>
+        <img src="{{ image['url'] }}" alt="{{ image['name'] }}">
+      {% endfor %}
+    </section>
+  {% else %}
+    <section class="panel">
+      <h2>{{ item["type"] }}: {{ item["filename"] }}</h2>
+      <p>{{ item["message"] }}</p>
+    </section>
+  {% endif %}
+{% endfor %}
+
+<section class="panel">
+  <a href="{{ url_for('index') }}">Processar outro ZIP</a>
+</section>
+{% endblock %}
