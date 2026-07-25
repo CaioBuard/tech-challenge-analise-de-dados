@@ -137,3 +137,22 @@ td {
   padding: 8px;
   text-align: left;
 }
+
+.text-content h3 {
+  margin: 16px 0 8px;
+  color: #0f4c81;
+}
+
+.text-content p {
+  margin: 6px 0;
+  line-height: 1.6;
+}
+
+.text-content ul {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.text-content li {
+  margin: 4px 0;
+}

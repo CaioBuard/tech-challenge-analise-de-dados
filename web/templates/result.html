@@ -97,7 +97,11 @@
   {% else %}
     <section class="panel">
       <h2>{{ item["type"] }}: {{ item["filename"] }}</h2>
-      <p>{{ item["message"] }}</p>
+      {% if item.get("formatted_text") %}
+        <div class="text-content">{{ item["formatted_text"]|safe }}</div>
+      {% else %}
+        <p>{{ item.get("message", "Sem conteúdo para exibir.") }}</p>
+      {% endif %}
     </section>
   {% endif %}
 {% endfor %}

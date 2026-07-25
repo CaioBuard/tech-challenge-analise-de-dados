@@ -1,5 +1,6 @@
 """Aplicacao Flask para upload de ZIP e exibicao de resultados."""
 
+from html import escape
 from pathlib import Path
 import sys
 import traceback
@@ -36,16 +37,13 @@ app = Flask(
 
 def _image_url(path):
     """Converte um arquivo gerado para URL servida pelo Flask."""
-    # Resolve o caminho recebido.
     image_path = Path(path).resolve()
-    # Resolve a raiz permitida dos arquivos gerados.
     output_root = OUTPUT_ROOT.resolve()
-    # Bloqueia caminhos fora da pasta generated.
+
     if output_root not in image_path.parents and image_path != output_root:
         return ""
-    # Calcula caminho relativo para a rota /generated.
+
     relative_path = image_path.relative_to(output_root).as_posix()
-    # Retorna URL Flask para servir a imagem.
     return url_for("generated_file", filename=relative_path)
 
 
@@ -54,29 +52,67 @@ def _generated_url(path):
     return _image_url(path)
 
 
+def _render_text_content(text_content):
+    """Converte texto simples em HTML seguro para a pagina de resultados."""
+    if not text_content:
+        return ""
+
+    html_parts = []
+    in_list = False
+
+    for raw_line in str(text_content).splitlines():
+        line = raw_line.strip()
+        if not line:
+            if in_list:
+                html_parts.append("</ul>")
+                in_list = False
+            continue
+
+        upper_line = line.upper()
+        if upper_line.startswith("TRANSCRICAO"):
+            if in_list:
+                html_parts.append("</ul>")
+                in_list = False
+            html_parts.append(f"<h3>{escape('TRANSCRICAO')}</h3>")
+        elif upper_line.startswith("ANALISE"):
+            if in_list:
+                html_parts.append("</ul>")
+                in_list = False
+            html_parts.append(f"<h3>{escape('ANALISE CLINICA PRELIMINAR')}</h3>")
+        elif line.startswith("- "):
+            if not in_list:
+                html_parts.append("<ul>")
+                in_list = True
+            html_parts.append(f"<li>{escape(line[2:])}</li>")
+        else:
+            if in_list:
+                html_parts.append("</ul>")
+                in_list = False
+            html_parts.append(f"<p>{escape(line)}</p>")
+
+    if in_list:
+        html_parts.append("</ul>")
+
+    return "".join(html_parts)
+
+
 def _prepare_result_for_template(result):
     """Prepara resultado do fluxo para ser renderizado pelo Jinja2."""
-    # Cria uma copia superficial para evitar alterar o resultado original.
     prepared = dict(result)
-    # Lista de arquivos processados pronta para o template.
     prepared_results = []
-    # Percorre cada item gerado pelo fluxo.
+
     for item in result.get("results", []):
-        # Cria uma copia do item atual.
+        if item is None:
+            continue
+
         prepared_item = dict(item)
-        # Prepara URLs de imagens quando o item for planilha.
+
         if prepared_item.get("type") == "xls":
-            # Lista de imagens com URL publica.
             prepared_images = []
-            # Percorre imagens geradas pela biblioteca.
             for image in prepared_item.get("images", []):
-                # Copia metadados da imagem.
                 prepared_image = dict(image)
-                # Adiciona URL que o navegador consegue carregar.
                 prepared_image["url"] = _image_url(image.get("path", ""))
-                # Guarda imagem preparada.
                 prepared_images.append(prepared_image)
-            # Substitui imagens brutas pelas imagens preparadas.
             prepared_item["images"] = prepared_images
         elif prepared_item.get("type") == "video":
             evaluation = dict(prepared_item.get("evaluation", {}))
@@ -86,77 +122,73 @@ def _prepare_result_for_template(result):
                 for name, path in report_paths.items()
             }
             prepared_item["evaluation"] = evaluation
-        # Adiciona item preparado.
+        elif prepared_item.get("type") in {"text", "audio"}:
+            if not prepared_item.get("formatted_text"):
+                text_content = prepared_item.get("text")
+                if not text_content and prepared_item.get("path"):
+                    candidate_path = Path(prepared_item["path"])
+                    if candidate_path.is_file():
+                        try:
+                            text_content = candidate_path.read_text(encoding="utf-8")
+                        except (OSError, UnicodeDecodeError):
+                            text_content = None
+
+                if not text_content:
+                    text_content = prepared_item.get("message") or prepared_item.get("content")
+
+                prepared_item["formatted_text"] = _render_text_content(text_content)
+
         prepared_results.append(prepared_item)
-    # Atualiza lista de resultados.
+
     prepared["results"] = prepared_results
-    # Retorna estrutura pronta para Jinja2.
     return prepared
 
 
 @app.get("/")
 def index():
     """Mostra pagina inicial de upload."""
-    # Renderiza o template inicial.
     return render_template("index.html")
 
 
 @app.post("/upload")
 def upload():
     """Recebe ZIP, executa LangGraph e mostra resultados."""
-    # Busca arquivo enviado pelo formulario.
     uploaded_file = request.files.get("zip_file")
-    # Valida se existe arquivo.
     if uploaded_file is None or uploaded_file.filename == "":
         return render_template("error.html", message="Nenhum arquivo enviado."), 400
-    # Valida extensao do arquivo.
     if not uploaded_file.filename.lower().endswith(".zip"):
         return render_template("error.html", message="Envie um arquivo .zip."), 400
-    # Processa upload com tratamento de erro amigavel.
+
     try:
-        # Le os bytes do ZIP enviado.
         zip_bytes = uploaded_file.read()
         print(f"[WEB] Processando upload: {uploaded_file.filename}", flush=True)
-        # Executa o fluxo LangGraph.
         result = run_zip_flow(zip_bytes, OUTPUT_ROOT)
         print(f"[WEB] Upload concluido: {uploaded_file.filename}", flush=True)
-        # Prepara URLs e metadados para o template.
         prepared_result = _prepare_result_for_template(result)
-        # Renderiza a pagina de resultado.
         return render_template("result.html", result=prepared_result)
-    # Em caso de erro, mostra mensagem simples e registra stack trace no terminal.
     except Exception as exc:
-        # Imprime erro completo no terminal para facilitar depuracao.
         traceback.print_exc()
-        # Renderiza pagina de erro.
         return render_template("error.html", message=str(exc)), 500
 
 
 @app.get("/generated/<path:filename>")
 def generated_file(filename):
     """Serve arquivos gerados pela aplicacao."""
-    # Resolve caminho pedido pelo navegador.
     file_path = (OUTPUT_ROOT / filename).resolve()
-    # Resolve raiz permitida.
     output_root = OUTPUT_ROOT.resolve()
-    # Bloqueia acesso fora de generated.
+
     if output_root not in file_path.parents and file_path != output_root:
         abort(403)
-    # Serve arquivo usando send_from_directory.
+
     return send_from_directory(output_root, filename)
 
 
 def main():
     """Sobe o servidor Flask local."""
-    # Garante que a pasta de arquivos gerados exista.
     OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
-    # Mostra URL no terminal.
     print("Servidor rodando em http://localhost:8000")
-    # Inicia Flask sem modo debug para evitar processo duplicado no Windows.
     app.run(host="localhost", port=8000, debug=False, use_reloader=False)
 
 
-# Executa o servidor quando o arquivo for chamado diretamente.
 if __name__ == "__main__":
-    # Chama funcao principal.
     main()
