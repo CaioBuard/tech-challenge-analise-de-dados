@@ -4,8 +4,6 @@ from pathlib import Path
 from typing import Any, Dict, List, TypedDict
 import uuid
 
-from langgraph.graph import END, StateGraph
-
 from zip_processor import classify_files, extract_zip, process_classified_files
 
 
@@ -23,6 +21,9 @@ class ZipFlowState(TypedDict, total=False):
 
 def run_zip_flow(zip_bytes, generated_root):
     """Executa o fluxo de upload usando LangGraph."""
+    # LangGraph so e necessario depois que um arquivo for enviado.
+    from langgraph.graph import END, StateGraph
+
     # Define etapa de extracao.
     def extract_node(state):
         # Extrai ZIP para pasta temporaria.

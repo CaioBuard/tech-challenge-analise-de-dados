@@ -6,11 +6,6 @@ import tempfile
 import uuid
 import zipfile
 
-from clinical_anomaly_detection import ClinicalAnomalyDetector
-
-from xls_converter import excel_to_patient_input
-
-
 # Extensoes aceitas como planilha.
 EXCEL_EXTENSIONS = {".xls", ".xlsx"}
 
@@ -19,6 +14,26 @@ VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".webm"}
 
 # Extensoes tratadas como audio.
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"}
+
+
+def _has_video_container_signature(file_path):
+    """Verifica a assinatura de contêineres de vídeo suportados pelo app."""
+    with Path(file_path).open("rb") as handle:
+        header = handle.read(32)
+    # MP4, MOV e 3GP usam uma caixa ``ftyp``; AVI usa RIFF; MKV/WebM usam EBML.
+    return (
+        header[4:8] == b"ftyp"
+        or (header[:4] == b"RIFF" and header[8:12] == b"AVI ")
+        or header[:4] == b"\x1aE\xdf\xa3"
+    )
+
+
+def _has_excel_container_signature(file_path):
+    """Verifica se o arquivo tem estrutura XLS ou XLSX antes de processa-lo."""
+    with Path(file_path).open("rb") as handle:
+        header = handle.read(8)
+    # XLSX e um arquivo ZIP; XLS usa o formato OLE Compound File.
+    return header.startswith(b"PK") or header == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
 
 
 def _safe_extract(zip_file, destination):
@@ -89,6 +104,13 @@ def classify_files(files):
 
 def _process_excel(file_path, output_root):
     """Processa uma planilha e executa a biblioteca de anomalias."""
+    if not _has_excel_container_signature(file_path):
+        return None
+
+    # Importa o modelo apenas quando houver uma planilha para processar.
+    from clinical_anomaly_detection import ClinicalAnomalyDetector
+    from xls_converter import excel_to_patient_input
+
     # Converte a planilha para o formato patient_input.
     patient_input = excel_to_patient_input(file_path)
     # Cria o detector usando caminhos relativos ao projeto raiz.
@@ -113,6 +135,29 @@ def _process_excel(file_path, output_root):
     }
 
 
+def _process_video(file_path, output_root):
+    """Avalia um video e grava seus relatorios na pasta deste upload."""
+    if not _has_video_container_signature(file_path):
+        return None
+
+    # Carrega OpenCV e YOLO somente quando o upload contem video.
+    from video_analysis import VideoEvaluator
+
+    report_dir = Path(output_root) / file_path.stem
+    print(f"[VIDEO] Iniciando avaliacao: {file_path.name}", flush=True)
+    try:
+        evaluation = VideoEvaluator(report_dir=str(report_dir)).evaluate(str(file_path))
+    except ValueError:
+        print(f"[VIDEO] Arquivo ignorado por nao ser um video legivel: {file_path.name}", flush=True)
+        return None
+    print(f"[VIDEO] Avaliacao concluida: {file_path.name}", flush=True)
+    return {
+        "type": "video",
+        "filename": file_path.name,
+        "evaluation": evaluation,
+    }
+
+
 def process_classified_files(classified_files, output_root):
     """Processa arquivos classificados e retorna resultados para a UI."""
     # Lista final de resultados.
@@ -121,18 +166,30 @@ def process_classified_files(classified_files, output_root):
     for item in classified_files:
         # Busca o caminho do arquivo.
         file_path = item["path"]
-        # Processa planilhas.
-        if item["type"] == "xls":
-            results.append(_process_excel(file_path, output_root))
-        # Retorna mensagem pendente para video.
-        elif item["type"] == "video":
-            results.append({"type": "video", "filename": file_path.name, "message": "Pendente: implementar retorno do video."})
-        # Retorna mensagem pendente para audio.
-        elif item["type"] == "audio":
-            results.append({"type": "audio", "filename": file_path.name, "message": "Pendente: implementar retorno do audio."})
-        # Registra arquivos ignorados.
-        else:
-            results.append({"type": "ignored", "filename": file_path.name, "message": "Arquivo ignorado: tipo nao suportado."})
+        try:
+            # Processa planilhas.
+            if item["type"] == "xls":
+                result = _process_excel(file_path, output_root)
+                if result is not None:
+                    results.append(result)
+            # Avalia videos clinicos com YOLO e regras de validacao.
+            elif item["type"] == "video":
+                result = _process_video(file_path, output_root)
+                if result is not None:
+                    results.append(result)
+            # Retorna mensagem pendente para audio.
+            elif item["type"] == "audio":
+                results.append({"type": "audio", "filename": file_path.name, "message": "Pendente: implementar retorno do audio."})
+            # Registra arquivos ignorados.
+            else:
+                results.append({"type": "ignored", "filename": file_path.name, "message": "Arquivo ignorado: tipo nao suportado."})
+        except Exception as error:
+            print(f"[WEB] Falha ao processar {file_path.name}: {error}", flush=True)
+            results.append({
+                "type": "error",
+                "filename": file_path.name,
+                "message": "Nao foi possivel processar este arquivo. Os demais arquivos do ZIP continuaram sendo analisados.",
+            })
     # Retorna todos os resultados.
     return results
 

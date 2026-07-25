@@ -23,8 +23,8 @@ if str(WEB_ROOT) not in sys.path:
 from flow import run_zip_flow
 
 
-# Pasta onde imagens geradas pela web serao salvas.
-GENERATED_ROOT = WEB_ROOT / "generated"
+# Pasta onde a aplicacao salva arquivos gerados para cada upload.
+OUTPUT_ROOT = WEB_ROOT / "generated"
 
 # Cria a aplicacao Flask usando templates e static dentro de web/.
 app = Flask(
@@ -35,18 +35,23 @@ app = Flask(
 
 
 def _image_url(path):
-    """Converte caminho de imagem gerada para URL servida pelo Flask."""
+    """Converte um arquivo gerado para URL servida pelo Flask."""
     # Resolve o caminho recebido.
     image_path = Path(path).resolve()
-    # Resolve a raiz permitida das imagens geradas.
-    generated_root = GENERATED_ROOT.resolve()
+    # Resolve a raiz permitida dos arquivos gerados.
+    output_root = OUTPUT_ROOT.resolve()
     # Bloqueia caminhos fora da pasta generated.
-    if generated_root not in image_path.parents and image_path != generated_root:
+    if output_root not in image_path.parents and image_path != output_root:
         return ""
     # Calcula caminho relativo para a rota /generated.
-    relative_path = image_path.relative_to(generated_root).as_posix()
+    relative_path = image_path.relative_to(output_root).as_posix()
     # Retorna URL Flask para servir a imagem.
     return url_for("generated_file", filename=relative_path)
+
+
+def _generated_url(path):
+    """Converte qualquer relatorio dentro de generated para uma URL publica."""
+    return _image_url(path)
 
 
 def _prepare_result_for_template(result):
@@ -73,6 +78,14 @@ def _prepare_result_for_template(result):
                 prepared_images.append(prepared_image)
             # Substitui imagens brutas pelas imagens preparadas.
             prepared_item["images"] = prepared_images
+        elif prepared_item.get("type") == "video":
+            evaluation = dict(prepared_item.get("evaluation", {}))
+            report_paths = evaluation.get("report_paths", {})
+            evaluation["report_urls"] = {
+                name: _generated_url(path)
+                for name, path in report_paths.items()
+            }
+            prepared_item["evaluation"] = evaluation
         # Adiciona item preparado.
         prepared_results.append(prepared_item)
     # Atualiza lista de resultados.
@@ -103,8 +116,10 @@ def upload():
     try:
         # Le os bytes do ZIP enviado.
         zip_bytes = uploaded_file.read()
+        print(f"[WEB] Processando upload: {uploaded_file.filename}", flush=True)
         # Executa o fluxo LangGraph.
-        result = run_zip_flow(zip_bytes, GENERATED_ROOT)
+        result = run_zip_flow(zip_bytes, OUTPUT_ROOT)
+        print(f"[WEB] Upload concluido: {uploaded_file.filename}", flush=True)
         # Prepara URLs e metadados para o template.
         prepared_result = _prepare_result_for_template(result)
         # Renderiza a pagina de resultado.
@@ -119,22 +134,22 @@ def upload():
 
 @app.get("/generated/<path:filename>")
 def generated_file(filename):
-    """Serve imagens geradas pela biblioteca."""
+    """Serve arquivos gerados pela aplicacao."""
     # Resolve caminho pedido pelo navegador.
-    file_path = (GENERATED_ROOT / filename).resolve()
+    file_path = (OUTPUT_ROOT / filename).resolve()
     # Resolve raiz permitida.
-    generated_root = GENERATED_ROOT.resolve()
+    output_root = OUTPUT_ROOT.resolve()
     # Bloqueia acesso fora de generated.
-    if generated_root not in file_path.parents and file_path != generated_root:
+    if output_root not in file_path.parents and file_path != output_root:
         abort(403)
     # Serve arquivo usando send_from_directory.
-    return send_from_directory(generated_root, filename)
+    return send_from_directory(output_root, filename)
 
 
 def main():
     """Sobe o servidor Flask local."""
     # Garante que a pasta de arquivos gerados exista.
-    GENERATED_ROOT.mkdir(parents=True, exist_ok=True)
+    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
     # Mostra URL no terminal.
     print("Servidor rodando em http://localhost:8000")
     # Inicia Flask sem modo debug para evitar processo duplicado no Windows.

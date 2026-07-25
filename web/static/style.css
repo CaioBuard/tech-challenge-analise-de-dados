@@ -27,6 +27,43 @@ main {
   cursor: pointer;
 }
 
+.btn:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.processing-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid #9ac1e5;
+  border-radius: 6px;
+  background: #eef7ff;
+}
+
+.processing-status[hidden] {
+  display: none;
+}
+
+.processing-status p {
+  margin: 5px 0 0;
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 3px solid #b7d5ed;
+  border-top-color: #0f4c81;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .alert {
   border-left: 5px solid #d62728;
   padding: 8px 12px;
@@ -46,6 +83,31 @@ main {
 
 .high {
   border-left-color: #d62728;
+  background: #fff0f0;
+}
+
+.status {
+  display: inline-block;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-weight: bold;
+}
+
+.status.normal,
+.alert.normal {
+  color: #176b2c;
+  background: #f3fff3;
+}
+
+.status.warning,
+.alert.warning {
+  color: #8a5100;
+  background: #fff8ed;
+}
+
+.status.critical,
+.alert.critical {
+  color: #9f1d1d;
   background: #fff0f0;
 }
 

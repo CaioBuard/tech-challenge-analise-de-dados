@@ -6,6 +6,19 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
-# Temporary generated web files
+# Ambiente e configuracao local
+.venv/
+.env
+.idea/
+.DS_Store
+~$*.xlsx
+
+# Saidas geradas pela aplicacao web
 web/generated/**
 !web/generated/.gitkeep
+
+# Pesos baixados em tempo de execucao pelo YOLO
+yolov*.pt
+
+# Midias de teste locais (envie-as pelo ZIP; nao versionar arquivos grandes)
+web/example/*.mp4

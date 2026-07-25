@@ -50,6 +50,50 @@
         <img src="{{ image['url'] }}" alt="{{ image['name'] }}">
       {% endfor %}
     </section>
+  {% elif item["type"] == "video" %}
+    {% set evaluation = item["evaluation"] %}
+    <section class="panel">
+      <h2>Vídeo: {{ item["filename"] }}</h2>
+      <p class="status {{ evaluation['status'] }}">Status: {{ evaluation["status"]|upper }}</p>
+
+      <h3>Resumo da avaliação</h3>
+      <table>
+        <tbody>
+          <tr><th>Frames analisados</th><td>{{ evaluation["frames_analyzed"] }} de {{ evaluation["frames_total"] }}</td></tr>
+          <tr><th>Duração</th><td>{{ evaluation["duration_seconds"] }} s</td></tr>
+          <tr><th>Detecções</th><td>{{ evaluation["total_detections"] }}</td></tr>
+          <tr><th>Paciente visível</th><td>{{ "%.0f"|format(evaluation["procedure_summary"]["patient_presence_rate"] * 100) }}%</td></tr>
+          <tr><th>Frames com objetos inesperados</th><td>{{ evaluation["frames_with_unexpected_objects"] }}</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Objetos detectados</h3>
+      {% if evaluation["objects_detected"] %}
+        <ul>
+          {% for label, count in evaluation["objects_detected"].items() %}
+            <li>{{ label }}: {{ count }}</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>Nenhum objeto detectado.</p>
+      {% endif %}
+
+      <h3>Achados</h3>
+      {% for finding in evaluation["procedure_findings"] %}
+        <div class="alert {{ finding['severity'] }}">
+          <strong>{{ finding["severity"]|upper }}</strong> — {{ finding["evidence"] }}<br>
+          {{ finding["recommendation"] }}
+        </div>
+      {% endfor %}
+
+      {% if evaluation["report_urls"] %}
+        <p>
+          Relatórios:
+          <a href="{{ evaluation['report_urls']['json'] }}" target="_blank">JSON</a> |
+          <a href="{{ evaluation['report_urls']['txt'] }}" target="_blank">TXT</a>
+        </p>
+      {% endif %}
+    </section>
   {% else %}
     <section class="panel">
       <h2>{{ item["type"] }}: {{ item["filename"] }}</h2>

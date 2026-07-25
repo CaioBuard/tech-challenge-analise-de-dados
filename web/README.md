@@ -73,7 +73,9 @@ Significado das colunas:
 - `intime`: data e hora de entrada do paciente na unidade.
 - `outtime`: data e hora de saida do paciente da unidade.
 
-Arquivos de audio e video ainda retornam apenas mensagens de pendencia.
+Arquivos de áudio ainda retornam uma mensagem de pendência. Vídeos são avaliados
+com YOLOv8: a aplicação verifica presença do paciente, excesso de pessoas no
+enquadramento e objetos inadequados, exibindo o resultado e relatórios JSON/TXT.
 
 ## Fluxo
 
